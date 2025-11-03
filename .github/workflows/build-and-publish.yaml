@@ -61,7 +61,6 @@ jobs:
 
       - name: Build and package
         run: |
-          npm install gulp-gzip --save-dev
           npm run build-npm-pkg
 
       - name: Setup Google Cloud SDK
