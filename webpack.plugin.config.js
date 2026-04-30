@@ -2,17 +2,15 @@ const path = require('path');
 const webpack = require('webpack');
 const glob = require('glob');
 const uglifyjs = require('uglify-js');
-const expose = require('expose-loader');
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+const TerserPlugin = require('terser-webpack-plugin');
 const fs = require('fs');
 const entryPlus = require('webpack-entry-plus');
-const UglifyJsPlugin = require('uglifyjs-webpack-plugin');
 
 
 var corePlugins = [
     "org.ekstep.conceptselector-1.1",
     "org.ekstep.topicselector-1.0",
-    "org.ekstep.assetbrowser-1.2",
     "org.ekstep.contenteditorfunctions-1.2",
     "org.ekstep.toaster-1.0"
 ];
@@ -74,7 +72,7 @@ function packagePlugins() {
             });
         }
         dependenciesArr.push('org.ekstep.pluginframework.pluginManager.registerPlugin(' + JSON.stringify(manifest) + ',' + pluginContent.code.replace(/;\s*$/, "") + ')')
-        fs.appendFile('plugins/' + plugin + '/editor/plugin.dist.js', [...dependenciesArr].join("\n"))
+        fs.appendFile('plugins/' + plugin + '/editor/plugin.dist.js', [...dependenciesArr].join("\n"), function(){})
         pluginPackageArr.push('./plugins/' + plugin + '/editor/plugin.dist.js')
     })
 
@@ -115,7 +113,8 @@ module.exports = {
             'qq': path.resolve('./node_modules/xmlbuilder/lib/index.js'),
             'X2JS': path.resolve('./plugins/org.ekstep.assessmentbrowser-1.1/editor/libs/xml2json.js'),
             'iziToast': path.resolve('./app/bower_components/izitoast/dist/js/iziToast.min.js'),
-
+            'global/document': path.resolve('./node_modules/global/window.js'),
+            'global/window': path.resolve('./node_modules/global/window.js')
         }
     },
     module: {
@@ -124,15 +123,14 @@ module.exports = {
                 test: require.resolve('./app/bower_components/izitoast/dist/js/iziToast.min.js'),
                 use: [{
                     loader: 'expose-loader',
-                    options: 'iziToast'
+                    options: {
+                        exposes: 'iziToast'
+                    }
                 }]
             },{
                 test: /\.(html)$/,
                 use: {
-                    loader: 'html-loader',
-                    options: {
-                        attrs: [':data-src']
-                    }
+                    loader: 'html-loader'
                 }
             },
             {
@@ -142,39 +140,22 @@ module.exports = {
                     {
                         loader: 'css-loader',
                         options: {
-                            sourceMap: false,
-                            minimize: true,
-                            "preset": "advanced",
-                            discardComments: {
-                                removeAll: true
-                            }
+                            sourceMap: false
                         }
                     },
                     {
                         loader: 'sass-loader',
                         options: {
-                            sourceMap: false,
-                            minimize: true,
-                            "preset": "advanced",
-                            discardComments: {
-                                removeAll: true
-                            }
+                            sourceMap: false
                         }
                     }
                 ]
             }, {
                 test: /\.(gif|png|jpe?g|svg)$/,
-                use: [
-                    'file-loader',
-                    {
-                        loader: 'url-loader',
-                        options: {
-                            limit: 50, //it's important
-                            outputPath: './images/assets',
-                            name: '[name].[ext]',
-                        }
-                    },
-                ],
+                type: 'asset/resource',
+                generator: {
+                    filename: 'images/assets/[name][ext]'
+                }
             }
         ]
     },
@@ -185,26 +166,26 @@ module.exports = {
         new webpack.ProvidePlugin({
             iziToast: 'iziToast'
         }),
-        new UglifyJsPlugin({
-            cache: false,
-            parallel: true,
-            uglifyOptions: {
-                compress: {
-                    dead_code: true,
-                    drop_console: false,
-                    global_defs: {
-                        DEBUG: true
-                    },
-                    passes: 1,
-                },
-                ecma: 5,
-                mangle: true
-            },
-            sourceMap: true
-        }),
     ],
     optimization: {
         minimize: true,
+        minimizer: [
+            new TerserPlugin({
+                parallel: true,
+                terserOptions: {
+                    compress: {
+                        dead_code: true,
+                        drop_console: false,
+                        global_defs: {
+                            DEBUG: true
+                        },
+                        passes: 1,
+                    },
+                    ecma: 5,
+                    mangle: true
+                }
+            })
+        ],
         splitChunks: {
             chunks: 'async',
             minSize: 30000,
